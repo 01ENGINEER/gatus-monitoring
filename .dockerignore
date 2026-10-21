@@ -1,0 +1,13 @@
+.git
+.github
+.terraform
+**/.terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+.env
+.env.*
+assets/
+infra/
+README.md
+.DS_Store
