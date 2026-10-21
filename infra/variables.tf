@@ -27,3 +27,9 @@ variable "domain_name" {
   type        = string
   default     = ""
 }
+
+variable "image_tag" {
+  description = "Docker image tag deployed to ECS"
+  type        = string
+  default     = "bootstrap"
+}
