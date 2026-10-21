@@ -23,6 +23,7 @@ Development is staged so that the application is tested locally before AWS resou
 | Amazon Route 53 | DNS for a future custom domain |
 | AWS Certificate Manager (ACM) | TLS certificate for future HTTPS access |
 | Terraform | Defines AWS infrastructure as code |
+| Amazon S3 | Planned remote storage and locking for Terraform state |
 | GitHub Actions | Builds Docker images and, later, automates deployment |
 | GitHub OIDC and AWS IAM | Planned short-lived, keyless AWS authentication |
 | Amazon CloudWatch | Stores ECS application logs |
@@ -54,6 +55,8 @@ gatus-monitoring/
 │   ├── architecture.jpg
 │   └── [project screenshots]
 ├── infra/
+│   ├── backend.tf
+│   ├── BACKEND.md
 │   ├── provider.tf
 │   ├── variables.tf
 │   ├── main.tf
@@ -148,10 +151,11 @@ The current workflow:
 
 ## Terraform Infrastructure as Code
 
-The `infra/` directory contains 13 Terraform files:
+The `infra/` directory contains 13 infrastructure Terraform files plus `backend.tf` for remote state configuration:
 
 | File | Responsibility |
 | --- | --- |
+| `backend.tf` | S3 remote state backend configuration |
 | `provider.tf` | Terraform version and AWS provider |
 | `variables.tf` | Region, project settings, image tag and optional domain |
 | `main.tf` | Shared resource naming and tags |
@@ -179,6 +183,30 @@ terraform -chdir=infra validate
 **Verified result:** `Success! The configuration is valid.`
 
 This confirms Terraform configuration validity, **not** successful creation of AWS resources. AWS credentials, cost review, deployment sequencing, state management, and integration testing are still required.
+
+### Terraform Remote State — Amazon S3
+
+The project includes an **S3 remote backend configuration** in [`infra/backend.tf`](infra/backend.tf), with setup notes in [`infra/BACKEND.md`](infra/BACKEND.md). The purpose is to store Terraform state centrally so that local Terraform commands and future GitHub Actions deployments can use the same state safely.
+
+The backend is configured for:
+
+- **AWS region:** `eu-west-2` (London).
+- **State object key:** `gatus-monitoring/dev/terraform.tfstate`.
+- **Encryption:** Enabled through the backend setting `encrypt = true`.
+- **State locking:** S3-native lockfile support with `use_lockfile = true`.
+- **Bucket name:** Supplied during `terraform init`, after the bucket has been created.
+
+The S3 bucket **must be created separately before initializing the remote backend**. During AWS setup, the bucket will be configured with public access blocked, versioning enabled, and appropriate IAM permissions. The GitHub Actions Terraform role will also need access to the state object and lockfile.
+
+After the bucket exists, the backend can be initialized with:
+
+```bash
+terraform -chdir=infra init -backend-config="bucket=YOUR_UNIQUE_BUCKET_NAME"
+```
+
+If a local Terraform state already exists, its migration must be reviewed and handled carefully rather than overwriting it. **Never commit `.tfstate` files, credentials, or sensitive Terraform variable files to GitHub.**
+
+**Current status:** The backend configuration and documentation have been prepared; the actual S3 bucket, remote initialization, and locking have **not yet been verified in AWS**.
 
 ### Domain and HTTPS
 
@@ -226,12 +254,14 @@ The remaining deployment workflow is intended to:
 - [x] Created a GitHub Actions workflow and verified a successful Docker build.
 - [x] Written all 13 Terraform configuration files.
 - [x] Completed local Terraform initialisation and validation.
+- [x] Added the S3 backend configuration and backend setup documentation (pending verification after pushing).
 
 ### Remaining
 
 - [ ] Review AWS costs and deployment readiness, especially NAT gateway charges.
 - [ ] Check for existing AWS resources and import them into Terraform state if necessary.
-- [ ] Configure AWS credentials and a safe Terraform state backend.
+- [ ] Configure AWS credentials and create a secure S3 state bucket.
+- [ ] Initialize and verify the S3 remote backend and state locking.
 - [ ] Bootstrap GitHub OIDC and complete deployment-role permissions.
 - [ ] Create or reuse ECR and push a versioned Docker image.
 - [ ] Deploy ECS Fargate, ALB and related infrastructure.
@@ -251,4 +281,4 @@ AWS services used in the planned architecture, particularly **NAT gateways, the 
 
 ---
 
-**Current status:** Local Gatus, Docker health verification, basic CI and Terraform validation are complete. AWS deployment, OIDC integration, full CD and HTTPS remain in progress.
+**Current status:** Local Gatus, Docker health verification, basic CI and Terraform validation are complete. S3 remote backend setup, AWS deployment, OIDC integration, full CD and HTTPS remain in progress.
