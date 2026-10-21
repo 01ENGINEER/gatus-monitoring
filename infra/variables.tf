@@ -33,3 +33,9 @@ variable "image_tag" {
   type        = string
   default     = "bootstrap"
 }
+
+variable "route53_zone_id" {
+  description = "Optional Route 53 public hosted zone ID for the domain"
+  type        = string
+  default     = ""
+}
